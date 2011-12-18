@@ -12,7 +12,7 @@ Author: PubPoet
 Author URI: http://pubpoet.com/
 License: GPL2
 */
-/*  Copyright 2011  Ulrich Sossou  (email : sorich87@gmail.com)
+/*  Copyright 2011  Ulrich Sossou  (https://github.com/sorich87)
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License, version 2, as
