@@ -1,13 +1,13 @@
 <?php
 /**
  * @package Import_Users_from_CSV
- * @version 0.3.1
+ * @version 0.3.2
  */
 /*
 Plugin Name: Import Users from CSV
 Plugin URI: http://pubpoet.com/plugins/
 Description: Import Users data and metadata from a csv file.
-Version: 0.3.1
+Version: 0.3.2
 Author: PubPoet
 Author URI: http://pubpoet.com/
 License: GPL2
@@ -109,6 +109,9 @@ class IS_IU_Import_Users {
 
 				// Let's process the data
 				foreach ( $rows as $rkey => $columns ) {
+					if ( ! $columns )
+						continue;
+
 					// Separate user data from meta
 					$userdata = $usermeta = array();
 					foreach ( $columns as $ckey => $column ) {
