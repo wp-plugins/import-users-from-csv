@@ -4,11 +4,11 @@
  */
 /*
 Plugin Name: Import Users from CSV
-Plugin URI: http://pubpoet.com/plugins/
+Plugin URI: http://wordpress.org/extend/plugins/import-users-from-csv/
 Description: Import Users data and metadata from a csv file.
-Version: 0.5.1
-Author: PubPoet
-Author URI: http://pubpoet.com/
+Version: 1.0.0
+Author: Ulrich Sossou
+Author URI: http://ulrichsossou.com/
 License: GPL2
 Text Domain: import-users-from-csv
 */
@@ -78,9 +78,14 @@ class IS_IU_Import_Users {
 				// Setup settings variables
 				$filename              = $_FILES['users_csv']['tmp_name'];
 				$password_nag          = isset( $_POST['password_nag'] ) ? $_POST['password_nag'] : false;
+				$users_update          = isset( $_POST['users_update'] ) ? $_POST['users_update'] : false;
 				$new_user_notification = isset( $_POST['new_user_notification'] ) ? $_POST['new_user_notification'] : false;
 
-				$results = self::import_csv( $filename, $password_nag, $new_user_notification );
+				$results = self::import_csv( $filename, array(
+					'password_nag' => $password_nag,
+					'new_user_notification' => $new_user_notification,
+					'users_update' => $users_update
+				) );
 
 				// No users imported?
 				if ( ! $results['user_ids'] )
@@ -153,8 +158,11 @@ class IS_IU_Import_Users {
 		<?php wp_nonce_field( 'is-iu-import-users-users-page_import', '_wpnonce-is-iu-import-users-users-page_import' ); ?>
 		<table class="form-table">
 			<tr valign="top">
-				<th scope="row"><label for"users_csv"><?php _e( 'CSV file' , 'import-users-from-csv'); ?></label></th>
-				<td><input type="file" id="users_csv" name="users_csv" value="" class="all-options" /></td>
+				<th scope="row"><label for="users_csv"><?php _e( 'CSV file' , 'import-users-from-csv'); ?></label></th>
+				<td>
+					<input type="file" id="users_csv" name="users_csv" value="" class="all-options" /><br />
+					<span class="description"><?php echo sprintf( __( 'You may want to see <a href="%s">the example of the CSV file</a>.' , 'import-users-from-csv'), plugin_dir_url(__FILE__).'examples/import.csv'); ?></span>
+				</td>
 			</tr>
 			<tr valign="top">
 				<th scope="row"><?php _e( 'Notification' , 'import-users-from-csv'); ?></th>
@@ -162,7 +170,7 @@ class IS_IU_Import_Users {
 					<legend class="screen-reader-text"><span><?php _e( 'Notification' , 'import-users-from-csv'); ?></span></legend>
 					<label for="new_user_notification">
 						<input id="new_user_notification" name="new_user_notification" type="checkbox" value="1" />
-						Send to new users
+						<?php _e('Send to new users', 'import-users-from-csv') ?>
 					</label>
 				</fieldset></td>
 			</tr>
@@ -172,13 +180,23 @@ class IS_IU_Import_Users {
 					<legend class="screen-reader-text"><span><?php _e( 'Password nag' , 'import-users-from-csv'); ?></span></legend>
 					<label for="password_nag">
 						<input id="password_nag" name="password_nag" type="checkbox" value="1" />
-						Show password nag on new users signon
+						<?php _e('Show password nag on new users signon', 'import-users-from-csv') ?>
+					</label>
+				</fieldset></td>
+			</tr>
+			<tr valign="top">
+				<th scope="row"><?php _e( 'Users update' , 'import-users-from-csv'); ?></th>
+				<td><fieldset>
+					<legend class="screen-reader-text"><span><?php _e( 'Users update' , 'import-users-from-csv' ); ?></span></legend>
+					<label for="users_update">
+						<input id="users_update" name="users_update" type="checkbox" value="1" />
+						<?php _e( 'Update user when a username or email exists', 'import-users-from-csv' ) ;?>
 					</label>
 				</fieldset></td>
 			</tr>
 		</table>
 		<p class="submit">
-			<input type="submit" class="button-primary" value="<?php _e( 'Import' , 'import-users-from-csv'); ?>" />
+		 	<input type="submit" class="button-primary" value="<?php _e( 'Import' , 'import-users-from-csv'); ?>" />
 		</p>
 	</form>
 <?php
@@ -189,8 +207,15 @@ class IS_IU_Import_Users {
 	 *
 	 * @since 0.5
 	 */
-	public static function import_csv( $filename, $password_nag = false, $new_user_notification = false ) {
+	public static function import_csv( $filename, $args ) {
 		$errors = $user_ids = array();
+
+		$defaults = array(
+			'password_nag' => false,
+			'new_user_notification' => false,
+			'users_update' => false
+		);
+		extract( wp_parse_args( $args, $defaults ) );
 
 		// User data fields list used to differentiate with user meta
 		$userdata_fields       = array(
@@ -235,9 +260,6 @@ class IS_IU_Import_Users {
 				$column_name = $headers[$ckey];
 				$column = trim( $column );
 
-				if ( empty( $column ) )
-					continue;
-
 				if ( in_array( $column_name, $userdata_fields ) ) {
 					$userdata[$column_name] = $column;
 				} else {
@@ -256,22 +278,30 @@ class IS_IU_Import_Users {
 			// Something to be done before importing one user?
 			do_action( 'is_iu_pre_user_import', $userdata, $usermeta );
 
-			// Are we updating an old user or creating a new one?
+			$user = $user_id = false;
+
+			if ( isset( $userdata['ID'] ) )
+				$user = get_user_by( 'ID', $userdata['ID'] );
+
+			if ( ! $user && $users_update ) {
+				if ( isset( $userdata['user_login'] ) )
+					$user = get_user_by( 'login', $userdata['user_login'] );
+
+				if ( ! $user && isset( $userdata['user_email'] ) )
+					$user = get_user_by( 'email', $userdata['user_email'] );
+			}
+
 			$update = false;
-			$user_id = 0;
-			if ( ! empty( $userdata['ID'] ) ) {
+			if ( $user ) {
+				$userdata['ID'] = $user->ID;
 				$update = true;
-				$user_id = $userdata['ID'];
 			}
 
 			// If creating a new user and no password was set, let auto-generate one!
 			if ( ! $update && empty( $userdata['user_pass'] ) )
 				$userdata['user_pass'] = wp_generate_password( 12, false );
 
-			// Insert or update... at last! If only user ID was provided, we don't need to do anything at all. :)
-			if ( array( 'ID' => $user_id ) == $userdata )
-				$user_id = get_userdata( $user_id )->ID; // To check if the user id exists
-			else if ( $update )
+			if ( $update )
 				$user_id = wp_update_user( $userdata );
 			else
 				$user_id = wp_insert_user( $userdata );
