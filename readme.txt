@@ -3,7 +3,7 @@ Contributors: sorich87
 Tags: user, users, csv, batch, import, importer, admin
 Requires at least: 3.1
 Tested up to: 3.6
-Stable tag: 0.6
+Stable tag: 1.0.0
 
 Import users from a CSV file into WordPress
 
@@ -74,7 +74,7 @@ You can try importing that file and look at the result.
 
 == Changelog ==
 
-= 0.6 =
+= 1.0.0 =
 * Fixed bug where importing fields with "0" value doesn't work
 * Added option to update existing users by username or email
 
